@@ -17,29 +17,43 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getCleanStoredUser(): User {
+  const saved = dbService.getUser();
+  if (saved && saved.email) {
+    // Purge old unsplash avatar from cache if present
+    if (saved.avatar && saved.avatar.includes('unsplash.com')) {
+      saved.avatar = '';
+      saved.avatarUrl = '';
+      dbService.saveUser(saved);
+    }
+    return saved;
+  }
+  return INITIAL_USER;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = dbService.getUser();
-    if (saved && saved.email) return saved;
-    return INITIAL_USER;
-  });
+  const [user, setUser] = useState<User | null>(() => getCleanStoredUser());
 
   const isCloudConnected = isSupabaseConfigured();
 
-  // Listen for real Supabase auth state changes and sync live from OAuth provider
+  // Listen for real Supabase auth state changes and sync live from OAuth / Email session
   useEffect(() => {
     if (!isCloudConnected || !supabase) return;
 
-    // Initial check on load
-    supabaseService.getCurrentUser().then((cloudUser) => {
-      if (cloudUser) {
-        setUser(cloudUser);
-        dbService.saveUser(cloudUser);
+    // 1. Initial Session Check (restores active Google or Magic Link session)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const cloudUser = await supabaseService.syncUserProfile(session.user);
+        if (cloudUser) {
+          setUser(cloudUser);
+          dbService.saveUser(cloudUser);
+        }
       }
     });
 
+    // 2. Auth State Change Listener (fires on SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED)
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
         const cloudUser = await supabaseService.syncUserProfile(session.user);
         if (cloudUser) {
           setUser(cloudUser);
@@ -57,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isCloudConnected]);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.email) {
       dbService.saveUser(user);
     }
   }, [user]);
@@ -71,14 +85,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    const cleanName = email.split('@')[0] || 'Creator';
     const newUser: User = {
       id: 'usr_' + Math.random().toString(36).substring(2, 9),
-      name: email.split('@')[0] || 'Creator',
-      displayName: email.split('@')[0] || 'Creator',
+      name: cleanName,
+      displayName: cleanName,
       email: email,
       avatar: '',
       avatarUrl: '',
-      handle: email.split('@')[0] || 'creator',
+      handle: cleanName.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
       role: role,
       isCustomProfile: false,
       balance: 0,
@@ -113,8 +128,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...updated,
       name: updated.name || updated.displayName || user.name,
       displayName: updated.displayName || updated.name || user.displayName,
-      avatar: updated.avatar || updated.avatarUrl || user.avatar,
-      avatarUrl: updated.avatarUrl || updated.avatar || user.avatarUrl,
+      avatar: updated.avatar || updated.avatarUrl || user.avatar || '',
+      avatarUrl: updated.avatarUrl || updated.avatar || user.avatarUrl || '',
       isCustomProfile: true
     };
     setUser(nextUser);

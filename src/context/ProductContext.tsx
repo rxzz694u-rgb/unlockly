@@ -160,10 +160,10 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const newProduct: Product = {
       id: productId,
-      creatorId: user?.id || 'usr_riyaz_creator',
-      creatorName: user?.name || 'Riyaz Ahmed',
-      creatorAvatar: user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-      creatorHandle: user?.handle || 'riyaz_creates',
+      creatorId: user?.id || 'usr_' + Date.now(),
+      creatorName: user?.displayName || user?.name || 'Creator',
+      creatorAvatar: user?.avatarUrl || user?.avatar || '',
+      creatorHandle: user?.handle || 'creator',
       title: draft.title || 'EXCLUSIVE CONTENT',
       description: draft.description || 'Exclusive private digital access.',
       price: Number(draft.price) || 0,

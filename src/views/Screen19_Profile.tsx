@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductContext';
 import { useNavigation } from '../context/NavigationContext';
@@ -14,7 +14,6 @@ import {
   SettingsIcon,
   TrashIcon,
   EditIcon,
-  CheckIcon,
   GoogleIcon
 } from '../assets/icons/Icons';
 
@@ -28,15 +27,37 @@ export const Screen19_Profile: React.FC = () => {
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
+  // Dynamic user details
+  const displayName = user?.displayName || user?.name || (user?.email ? user.email.split('@')[0] : 'Creator');
+  const userEmail = user?.email || '';
+  const userHandle = user?.handle || (user?.email ? user.email.split('@')[0] : 'creator');
+  const avatar = user?.avatarUrl || user?.avatar || '';
+
+  const hasValidAvatar = Boolean(
+    avatar &&
+    !avatar.includes('unsplash.com') &&
+    avatar.trim().length > 0 &&
+    (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:'))
+  );
+
   // Edit profile form state
-  const [displayNameInput, setDisplayNameInput] = useState(user?.displayName || user?.name || '');
-  const [avatarUrlInput, setAvatarUrlInput] = useState(user?.avatarUrl || user?.avatar || '');
-  const [handleInput, setHandleInput] = useState(user?.handle || '');
+  const [displayNameInput, setDisplayNameInput] = useState(displayName);
+  const [avatarUrlInput, setAvatarUrlInput] = useState(hasValidAvatar ? avatar : '');
+  const [handleInput, setHandleInput] = useState(userHandle);
   const [ibanInput, setIbanInput] = useState(user?.payoutIban || '');
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    setDisplayNameInput(displayName);
+    setAvatarUrlInput(hasValidAvatar ? avatar : '');
+    setHandleInput(userHandle);
+  }, [user]);
+
   const getInitials = (name?: string) => {
-    if (!name) return 'U';
+    if (!name || name === 'Creator') {
+      if (userEmail) return userEmail.slice(0, 2).toUpperCase();
+      return 'CR';
+    }
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -75,7 +96,8 @@ export const Screen19_Profile: React.FC = () => {
 
   const handleClearData = () => {
     clearAllData();
-    showToast('All local storage cleared', undefined, 'info');
+    localStorage.clear();
+    showToast('All local cache cleared', undefined, 'info');
     navigateTo('home');
   };
 
@@ -84,9 +106,6 @@ export const Screen19_Profile: React.FC = () => {
     showToast('Logged out of Unlockly', undefined, 'info');
     navigateTo('welcome');
   };
-
-  const avatar = user?.avatarUrl || user?.avatar;
-  const displayName = user?.displayName || user?.name || 'Creator';
 
   return (
     <div className="app-content p-page" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -101,14 +120,10 @@ export const Screen19_Profile: React.FC = () => {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {avatar ? (
+          {hasValidAvatar ? (
             <img
               src={avatar}
               alt={displayName}
-              onError={(e) => {
-                // Fallback to initials circle if image url fails to load
-                (e.target as HTMLElement).style.display = 'none';
-              }}
               style={{
                 width: 68,
                 height: 68,
@@ -131,7 +146,8 @@ export const Screen19_Profile: React.FC = () => {
                 justifyContent: 'center',
                 fontSize: 22,
                 fontWeight: 800,
-                letterSpacing: '-0.02em'
+                letterSpacing: '-0.02em',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}
             >
               {getInitials(displayName)}
@@ -153,10 +169,10 @@ export const Screen19_Profile: React.FC = () => {
               {displayName}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-              @{user?.handle || 'creator'}
+              @{userHandle}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.email || 'No email connected'}
+              {userEmail ? userEmail : 'No email connected'}
             </div>
           </div>
         </div>
@@ -178,16 +194,16 @@ export const Screen19_Profile: React.FC = () => {
                 {user.isCustomProfile ? 'Google Auth (Custom Profile)' : 'Google OAuth Synced'}
               </span>
             ) : (
-              <span>{user?.isCustomProfile ? 'Custom Profile' : 'Email Account'}</span>
+              <span>{user?.isCustomProfile ? 'Custom Profile' : userEmail ? 'Email Account' : 'Guest Session'}</span>
             )}
           </div>
 
           <button
             type="button"
             onClick={() => {
-              setDisplayNameInput(user?.displayName || user?.name || '');
-              setAvatarUrlInput(user?.avatarUrl || user?.avatar || '');
-              setHandleInput(user?.handle || '');
+              setDisplayNameInput(displayName);
+              setAvatarUrlInput(hasValidAvatar ? avatar : '');
+              setHandleInput(userHandle);
               setIsEditProfileOpen(true);
             }}
             style={{
