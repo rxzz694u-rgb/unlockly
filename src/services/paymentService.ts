@@ -149,7 +149,7 @@ export const paymentService = {
 
     // Check permissions table
     const hasPermission = permissions.some(
-      (p) => p.productId === productId && p.accessStatus === 'granted' && (p.userId === userIdOrEmail || userIdOrEmail === 'usr_riyaz_creator')
+      (p) => p.productId === productId && p.accessStatus === 'granted' && p.userId === userIdOrEmail
     );
 
     if (hasPermission) return true;

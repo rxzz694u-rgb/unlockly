@@ -20,14 +20,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onInitiatePayment
 }) => {
   const { user } = useAuth();
-  const [email, setEmail] = useState(user?.email || 'sarah.c@gmail.com');
+  const [email, setEmail] = useState(user?.email || '');
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('apple_pay');
 
   // Card details state
-  const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
-  const [expDate, setExpDate] = useState('08/28');
-  const [cvc, setCvc] = useState('884');
-  const [cardHolder, setCardHolder] = useState(user?.name || 'Sarah Connor');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expDate, setExpDate] = useState('');
+  const [cvc, setCvc] = useState('');
+  const [cardHolder, setCardHolder] = useState(user?.name || '');
 
   const handlePay = () => {
     onInitiatePayment(

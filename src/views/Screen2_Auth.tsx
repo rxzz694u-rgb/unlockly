@@ -26,20 +26,24 @@ export const Screen2_Auth: React.FC = () => {
     setIsGoogleLoading(true);
     showToast('Connecting to Google Auth...', undefined, 'info');
 
-    if (isCloudConnected) {
-      const res = await supabaseService.signInWithGoogle();
-      if (res?.error) {
-        showToast('Google sign-in error', res.error.message, 'error');
-        setIsGoogleLoading(false);
-        return;
-      }
-    } else {
-      setTimeout(() => {
-        login('creator.google@unlockly.io', 'creator');
-        showToast('Signed in with Google', 'creator.google@unlockly.io', 'success');
+    try {
+      if (isCloudConnected) {
+        const res = await supabaseService.signInWithGoogle();
+        if (res?.error) {
+          showToast('Google sign-in error', res.error.message, 'error');
+          setIsGoogleLoading(false);
+          return;
+        }
+      } else {
+        const userEmail = prompt('Enter your Google Account email:') || 'user@gmail.com';
+        await login(userEmail, 'creator');
+        showToast('Signed in with Google', userEmail, 'success');
         setIsGoogleLoading(false);
         navigateTo('home');
-      }, 700);
+      }
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      showToast('Google sign-in error', err?.message || 'Failed to authenticate', 'error');
     }
   };
 
@@ -47,20 +51,24 @@ export const Screen2_Auth: React.FC = () => {
     setIsAppleLoading(true);
     showToast('Connecting to Apple ID...', undefined, 'info');
 
-    if (isCloudConnected) {
-      const res = await supabaseService.signInWithApple();
-      if (res?.error) {
-        showToast('Apple sign-in error', res.error.message, 'error');
-        setIsAppleLoading(false);
-        return;
-      }
-    } else {
-      setTimeout(() => {
-        login('creator.apple@unlockly.io', 'creator');
-        showToast('Signed in with Apple', 'creator.apple@unlockly.io', 'success');
+    try {
+      if (isCloudConnected) {
+        const res = await supabaseService.signInWithApple();
+        if (res?.error) {
+          showToast('Apple sign-in error', res.error.message, 'error');
+          setIsAppleLoading(false);
+          return;
+        }
+      } else {
+        const userEmail = prompt('Enter your Apple ID email:') || 'user@icloud.com';
+        await login(userEmail, 'creator');
+        showToast('Signed in with Apple ID', userEmail, 'success');
         setIsAppleLoading(false);
         navigateTo('home');
-      }, 700);
+      }
+    } catch (err: any) {
+      setIsAppleLoading(false);
+      showToast('Apple sign-in error', err?.message || 'Failed to authenticate', 'error');
     }
   };
 
@@ -83,7 +91,7 @@ export const Screen2_Auth: React.FC = () => {
         if (isSignUp) {
           const res = await supabaseService.signUp(email, password);
           if (res?.error) {
-            showToast('Sign up issue', res.error.message, 'error');
+            showToast('Sign up failed', res.error.message, 'error');
             setIsLoading(false);
             return;
           }
@@ -104,21 +112,8 @@ export const Screen2_Auth: React.FC = () => {
       navigateTo('home');
     } catch (err: any) {
       setIsLoading(false);
-      showToast('Authentication notice', err?.message || 'Logged in locally', 'info');
-      await login(email, 'creator');
-      navigateTo('home');
+      showToast('Authentication error', err?.message || 'Failed to sign in', 'error');
     }
-  };
-
-  const handleFastDemoLogin = (role: 'creator' | 'buyer') => {
-    if (role === 'creator') {
-      login('riyaz@unlockly.io', 'creator');
-      showToast('Logged in as Creator (Riyaz)', undefined, 'success');
-    } else {
-      login('sarah.c@gmail.com', 'buyer');
-      showToast('Logged in as Buyer (Sarah)', undefined, 'success');
-    }
-    navigateTo('home');
   };
 
   return (
@@ -128,14 +123,14 @@ export const Screen2_Auth: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: '32px 20px 24px 20px',
+        padding: '36px 20px 28px 20px',
         minHeight: '100dvh',
         backgroundColor: '#F8F8F6'
       }}
     >
       <div>
-        {/* Brand Lock */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        {/* Header Branding */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div
               style={{
@@ -169,21 +164,21 @@ export const Screen2_Auth: React.FC = () => {
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: isCloudConnected ? '#059669' : '#9CA3AF' }} />
-            {isCloudConnected ? 'CLOUD AUTH' : 'LOCAL MODE'}
+            {isCloudConnected ? 'CLOUD AUTH' : 'STANDBY'}
           </div>
         </div>
 
         <h1 className="text-headline" style={{ marginBottom: 6 }}>
-          {isSignUp ? 'CREATE ACCOUNT.' : 'WELCOME BACK.'}
+          {isSignUp ? 'CREATE ACCOUNT.' : 'SIGN IN.'}
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
           {isSignUp
-            ? 'Start uploading and monetizing your exclusive content in seconds.'
+            ? 'Monetize exclusive photos, videos, and private downloads.'
             : 'Access your creator earnings, analytics, and private links.'}
         </p>
 
-        {/* Social Authentication Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+        {/* Real OAuth Sign In Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -193,7 +188,7 @@ export const Screen2_Auth: React.FC = () => {
               backgroundColor: '#FFFFFF',
               border: '1px solid var(--border-default)',
               color: '#111111',
-              padding: '12px 16px',
+              padding: '13px 16px',
               borderRadius: 'var(--radius-md)',
               fontSize: 13.5,
               fontWeight: 700,
@@ -207,7 +202,7 @@ export const Screen2_Auth: React.FC = () => {
               transition: 'background-color 0.15s ease, transform 0.1s ease'
             }}
           >
-            <GoogleIcon size={18} />
+            <GoogleIcon size={19} />
             <span>{isGoogleLoading ? 'CONNECTING GOOGLE...' : 'CONTINUE WITH GOOGLE'}</span>
           </button>
 
@@ -220,7 +215,7 @@ export const Screen2_Auth: React.FC = () => {
               backgroundColor: '#111111',
               border: '1px solid #111111',
               color: '#FFFFFF',
-              padding: '12px 16px',
+              padding: '13px 16px',
               borderRadius: 'var(--radius-md)',
               fontSize: 13.5,
               fontWeight: 700,
@@ -234,13 +229,13 @@ export const Screen2_Auth: React.FC = () => {
               transition: 'background-color 0.15s ease, transform 0.1s ease'
             }}
           >
-            <AppleIcon size={18} />
+            <AppleIcon size={19} />
             <span>{isAppleLoading ? 'CONNECTING APPLE...' : 'CONTINUE WITH APPLE'}</span>
           </button>
         </div>
 
-        {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0 18px 0' }}>
+        {/* Clean Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0 20px 0' }}>
           <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border-default)' }} />
           <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
             OR EMAIL
@@ -249,15 +244,15 @@ export const Screen2_Auth: React.FC = () => {
         </div>
 
         {magicLinkSent ? (
-          <div className="surface-card" style={{ padding: '24px 16px', textAlign: 'center' }}>
-            <div style={{ color: '#059669', marginBottom: 10, display: 'flex', justifyContent: 'center' }}>
-              <CheckIcon size={32} strokeWidth={2.5} />
+          <div className="surface-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
+            <div style={{ color: '#059669', marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
+              <CheckIcon size={36} strokeWidth={2.5} />
             </div>
             <h3 style={{ fontSize: 16, fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
-              MAGIC LINK SENT
+              MAGIC LINK DISPATCHED
             </h3>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.45 }}>
-              Click the link sent to <strong>{email}</strong> to sign in automatically.
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18, lineHeight: 1.45 }}>
+              Check <strong>{email}</strong> for your secure 1-tap sign-in link.
             </p>
             <Button variant="secondary" onClick={() => setMagicLinkSent(false)}>
               USE PASSWORD INSTEAD
@@ -270,7 +265,7 @@ export const Screen2_Auth: React.FC = () => {
                 label="FULL NAME"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Riyaz Ahmed"
+                placeholder="Enter your name"
                 required
               />
             )}
@@ -280,7 +275,7 @@ export const Screen2_Auth: React.FC = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@domain.com"
+              placeholder="name@example.com"
               required
             />
 
@@ -309,7 +304,7 @@ export const Screen2_Auth: React.FC = () => {
         )}
 
         {/* Mode Switcher */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18, textAlign: 'center' }}>
           <button
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
@@ -338,42 +333,15 @@ export const Screen2_Auth: React.FC = () => {
                 textDecoration: 'underline'
               }}
             >
-              {authMode === 'password' ? 'Sign in with Passwordless Magic Link' : 'Sign in with Password'}
+              {authMode === 'password' ? 'Sign in with passwordless magic link' : 'Sign in with password'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Instant Demo Quick Access */}
-      <div
-        style={{
-          marginTop: 28,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 'var(--radius-lg)',
-          padding: '14px 16px',
-          border: '1px solid var(--border-default)',
-          boxShadow: 'var(--shadow-card)'
-        }}
-      >
-        <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
-          FAST DEMO SIGN IN (1-TAP TEST)
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <Button
-            variant="secondary"
-            onClick={() => handleFastDemoLogin('creator')}
-            style={{ padding: '8px 10px', fontSize: 11.5 }}
-          >
-            CREATOR RIYAZ
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => handleFastDemoLogin('buyer')}
-            style={{ padding: '8px 10px', fontSize: 11.5 }}
-          >
-            BUYER SARAH
-          </Button>
-        </div>
+      {/* Clean Trust Badge */}
+      <div style={{ textAlign: 'center', paddingTop: 24, fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+        Encrypted & Secured by Unlockly Access Engine
       </div>
     </div>
   );

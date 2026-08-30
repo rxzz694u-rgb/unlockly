@@ -57,13 +57,13 @@ export const Screen19_Profile: React.FC = () => {
 
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
-            {user?.name || 'Riyaz Ahmed'}
+            {user?.name || 'Creator'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-            @{user?.handle || 'riyaz_creates'}
+            @{user?.handle || 'creator'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-            {user?.email || 'riyaz@unlockly.io'}
+            {user?.email || 'No email connected'}
           </div>
         </div>
       </div>

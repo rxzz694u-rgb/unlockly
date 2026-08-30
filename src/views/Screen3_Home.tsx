@@ -42,7 +42,7 @@ export const Screen3_Home: React.FC = () => {
             marginTop: 2
           }}
         >
-          {getGreeting()}, {user?.name?.split(' ')[0] || 'Riyaz'}
+          {getGreeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
         </h1>
       </div>
 
