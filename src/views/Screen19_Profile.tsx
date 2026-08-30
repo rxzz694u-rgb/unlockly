@@ -6,21 +6,69 @@ import { useToast } from '../context/ToastContext';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
 import { Input } from '../components/common/Input';
-import { WalletIcon, CreditCardIcon, LibraryIcon, ShieldIcon, SettingsIcon, TrashIcon } from '../assets/icons/Icons';
+import {
+  WalletIcon,
+  CreditCardIcon,
+  LibraryIcon,
+  ShieldIcon,
+  SettingsIcon,
+  TrashIcon,
+  EditIcon,
+  CheckIcon,
+  GoogleIcon
+} from '../assets/icons/Icons';
 
 export const Screen19_Profile: React.FC = () => {
-  const { user, logout, switchRole, updateProfile } = useAuth();
+  const { user, logout, switchRole, updateProfile, isCloudConnected } = useAuth();
   const { clearAllData } = useProducts();
   const { navigateTo } = useNavigation();
   const { showToast } = useToast();
 
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
-  const [ibanInput, setIbanInput] = useState(user?.payoutIban || 'AE07 0331 2345 6789 0123 456');
 
-  const handleSavePayout = (e: React.FormEvent) => {
+  // Edit profile form state
+  const [displayNameInput, setDisplayNameInput] = useState(user?.displayName || user?.name || '');
+  const [avatarUrlInput, setAvatarUrlInput] = useState(user?.avatarUrl || user?.avatar || '');
+  const [handleInput, setHandleInput] = useState(user?.handle || '');
+  const [ibanInput, setIbanInput] = useState(user?.payoutIban || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ payoutIban: ibanInput });
+    setIsSaving(true);
+
+    try {
+      await updateProfile({
+        name: displayNameInput.trim(),
+        displayName: displayNameInput.trim(),
+        avatar: avatarUrlInput.trim(),
+        avatarUrl: avatarUrlInput.trim(),
+        handle: handleInput.trim()
+      });
+
+      setIsSaving(false);
+      setIsEditProfileOpen(false);
+      showToast('Profile updated & saved to cloud', undefined, 'success');
+    } catch (err: any) {
+      setIsSaving(false);
+      showToast('Error updating profile', err?.message, 'error');
+    }
+  };
+
+  const handleSavePayout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await updateProfile({ payoutIban: ibanInput });
     setIsPayoutModalOpen(false);
     showToast('Payout bank details updated', undefined, 'success');
   };
@@ -37,38 +85,131 @@ export const Screen19_Profile: React.FC = () => {
     navigateTo('welcome');
   };
 
+  const avatar = user?.avatarUrl || user?.avatar;
+  const displayName = user?.displayName || user?.name || 'Creator';
+
   return (
-    <div className="app-content p-page" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div className="app-content p-page" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Profile Header Card */}
       <div
         className="surface-card"
         style={{
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: 'column',
           gap: 16,
           padding: '20px'
         }}
       >
-        <img
-          src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200'}
-          alt={user?.name || 'User'}
-          style={{ width: 64, height: 64, borderRadius: 'var(--radius-full)', objectFit: 'cover' }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={displayName}
+              onError={(e) => {
+                // Fallback to initials circle if image url fails to load
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: 'var(--radius-full)',
+                objectFit: 'cover',
+                border: '2px solid var(--border-default)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: '#111111',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 22,
+                fontWeight: 800,
+                letterSpacing: '-0.02em'
+              }}
+            >
+              {getInitials(displayName)}
+            </div>
+          )}
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '-0.02em' }}>
-            {user?.name || 'Creator'}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                letterSpacing: '-0.02em',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {displayName}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+              @{user?.handle || 'creator'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.email || 'No email connected'}
+            </div>
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
-            @{user?.handle || 'creator'}
+        </div>
+
+        {/* Sync Status Badge & Edit Action */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: 12,
+            borderTop: '1px solid var(--border-subtle)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-secondary)' }}>
+            {user?.authProvider === 'google' ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#111111', fontWeight: 600 }}>
+                <GoogleIcon size={14} />
+                {user.isCustomProfile ? 'Google Auth (Custom Profile)' : 'Google OAuth Synced'}
+              </span>
+            ) : (
+              <span>{user?.isCustomProfile ? 'Custom Profile' : 'Email Account'}</span>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-            {user?.email || 'No email connected'}
-          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDisplayNameInput(user?.displayName || user?.name || '');
+              setAvatarUrlInput(user?.avatarUrl || user?.avatar || '');
+              setHandleInput(user?.handle || '');
+              setIsEditProfileOpen(true);
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#111111',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              textTransform: 'uppercase'
+            }}
+          >
+            <EditIcon size={14} />
+            Edit Profile
+          </button>
         </div>
       </div>
 
-      {/* Role Switcher Widget */}
+      {/* Role Switcher Simulation */}
       <div
         style={{
           backgroundColor: 'var(--bg-surface-subtle)',
@@ -82,7 +223,7 @@ export const Screen19_Profile: React.FC = () => {
       >
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 800, textTransform: 'uppercase' }}>
-            CURRENT MODE: {user?.role === 'creator' ? 'CREATOR' : 'BUYER'}
+            CURRENT ROLE: {user?.role === 'creator' ? 'CREATOR' : 'BUYER'}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-secondary)', marginTop: 2 }}>
             Switch to test from different user perspectives
@@ -211,9 +352,9 @@ export const Screen19_Profile: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <TrashIcon size={19} className="text-red-500" />
+            <TrashIcon size={19} />
             <span style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', color: 'var(--accent-danger)' }}>
-              CLEAR ALL STORED DATA
+              CLEAR LOCAL CACHE
             </span>
           </div>
           <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>→</span>
@@ -226,6 +367,42 @@ export const Screen19_Profile: React.FC = () => {
           LOG OUT
         </Button>
       </div>
+
+      {/* Edit Profile Modal */}
+      <Modal isOpen={isEditProfileOpen} onClose={() => setIsEditProfileOpen(false)} title="EDIT PROFILE">
+        <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Updating your profile sets custom details that won't be overwritten by future Google logins.
+          </p>
+
+          <Input
+            label="DISPLAY NAME"
+            value={displayNameInput}
+            onChange={(e) => setDisplayNameInput(e.target.value)}
+            placeholder="e.g. Riyaz Ahmed"
+            required
+          />
+
+          <Input
+            label="USERNAME HANDLE"
+            value={handleInput}
+            onChange={(e) => setHandleInput(e.target.value)}
+            placeholder="e.g. riyaz_creates"
+            required
+          />
+
+          <Input
+            label="CUSTOM AVATAR IMAGE URL (OPTIONAL)"
+            value={avatarUrlInput}
+            onChange={(e) => setAvatarUrlInput(e.target.value)}
+            placeholder="https://..."
+          />
+
+          <Button variant="primary" type="submit" isLoading={isSaving}>
+            SAVE CHANGES
+          </Button>
+        </form>
+      </Modal>
 
       {/* Payout Settings Modal */}
       <Modal isOpen={isPayoutModalOpen} onClose={() => setIsPayoutModalOpen(false)} title="PAYOUT SETTINGS">

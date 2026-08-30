@@ -11,15 +11,20 @@ export type AccessStatus = 'granted' | 'revoked';
 export interface User {
   id: string;
   name: string;
+  displayName?: string;
   email: string;
   avatar: string;
+  avatarUrl?: string;
   role: 'creator' | 'buyer';
   handle: string;
+  authProvider?: string;
+  isCustomProfile?: boolean;
   balance: number;
   totalEarnings: number;
   currency: CurrencyCode;
   payoutIban?: string;
   payoutMethod?: string;
+  lastSyncedAt?: string;
   createdAt: string;
 }
 

@@ -12,7 +12,7 @@ interface AuthContextType {
   login: (email: string, role?: 'creator' | 'buyer', password?: string) => Promise<void>;
   logout: () => void;
   switchRole: (role: 'creator' | 'buyer') => void;
-  updateProfile: (updated: Partial<User>) => void;
+  updateProfile: (updated: Partial<User>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,10 +26,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const isCloudConnected = isSupabaseConfigured();
 
-  // Listen for real Supabase auth state changes
+  // Listen for real Supabase auth state changes and sync live from OAuth provider
   useEffect(() => {
     if (!isCloudConnected || !supabase) return;
 
+    // Initial check on load
     supabaseService.getCurrentUser().then((cloudUser) => {
       if (cloudUser) {
         setUser(cloudUser);
@@ -38,14 +39,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const cloudUser = await supabaseService.getCurrentUser();
+      if ((event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION') && session?.user) {
+        const cloudUser = await supabaseService.syncUserProfile(session.user);
         if (cloudUser) {
           setUser(cloudUser);
           dbService.saveUser(cloudUser);
         }
       } else if (event === 'SIGNED_OUT') {
         setUser(INITIAL_USER);
+        localStorage.removeItem('unlockly_user');
       }
     });
 
@@ -72,10 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newUser: User = {
       id: 'usr_' + Math.random().toString(36).substring(2, 9),
       name: email.split('@')[0] || 'Creator',
+      displayName: email.split('@')[0] || 'Creator',
       email: email,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+      avatar: '',
+      avatarUrl: '',
       handle: email.split('@')[0] || 'creator',
       role: role,
+      isCustomProfile: false,
       balance: 0,
       totalEarnings: 0,
       currency: 'AED',
@@ -101,11 +106,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dbService.saveUser(nextUser);
   };
 
-  const updateProfile = (updated: Partial<User>) => {
+  const updateProfile = async (updated: Partial<User>) => {
     if (!user) return;
-    const nextUser = { ...user, ...updated };
+    const nextUser: User = {
+      ...user,
+      ...updated,
+      name: updated.name || updated.displayName || user.name,
+      displayName: updated.displayName || updated.name || user.displayName,
+      avatar: updated.avatar || updated.avatarUrl || user.avatar,
+      avatarUrl: updated.avatarUrl || updated.avatar || user.avatarUrl,
+      isCustomProfile: true
+    };
     setUser(nextUser);
     dbService.saveUser(nextUser);
+
+    if (isCloudConnected && user.id) {
+      await supabaseService.updateUserProfile(user.id, {
+        displayName: nextUser.name,
+        avatarUrl: nextUser.avatar,
+        handle: nextUser.handle,
+        currency: nextUser.currency,
+        payoutIban: nextUser.payoutIban
+      });
+    }
   };
 
   return (

@@ -81,31 +81,123 @@ export const supabaseService = {
     await supabase.auth.signOut();
   },
 
-  async getCurrentUser(): Promise<User | null> {
-    if (!supabase) return null;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+  async syncUserProfile(authUser: any): Promise<User | null> {
+    if (!supabase || !authUser) return null;
 
-    // Fetch user profile from database
+    const googleName =
+      authUser.user_metadata?.full_name ||
+      authUser.user_metadata?.name ||
+      authUser.user_metadata?.display_name ||
+      authUser.email?.split('@')[0] ||
+      'Creator';
+
+    const googleAvatar =
+      authUser.user_metadata?.avatar_url ||
+      authUser.user_metadata?.picture ||
+      '';
+
+    const authProvider = authUser.app_metadata?.provider || 'google';
+
+    // 1. Fetch current profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', authUser.id)
       .single();
 
+    let finalDisplayName = googleName;
+    let finalAvatarUrl = googleAvatar;
+    let isCustom = false;
+
+    if (profile) {
+      isCustom = profile.is_custom_profile || false;
+
+      if (!isCustom) {
+        // Live sync from OAuth metadata on login
+        await supabase
+          .from('profiles')
+          .update({
+            display_name: googleName,
+            avatar_url: googleAvatar,
+            email: authUser.email,
+            auth_provider: authProvider,
+            last_synced_at: new Date().toISOString()
+          })
+          .eq('id', authUser.id);
+
+        finalDisplayName = googleName;
+        finalAvatarUrl = googleAvatar;
+      } else {
+        finalDisplayName = profile.display_name || googleName;
+        finalAvatarUrl = profile.avatar_url || googleAvatar;
+      }
+    } else {
+      // Create initial profile record
+      const handle =
+        authUser.user_metadata?.user_name ||
+        authUser.email?.split('@')[0]?.replace(/[^a-zA-Z0-9_]/g, '_') ||
+        'creator_' + Math.random().toString(36).substring(2, 6);
+
+      await supabase.from('profiles').insert({
+        id: authUser.id,
+        display_name: googleName,
+        avatar_url: googleAvatar,
+        email: authUser.email,
+        handle: handle,
+        auth_provider: authProvider,
+        is_custom_profile: false,
+        last_synced_at: new Date().toISOString()
+      });
+    }
+
     return {
-      id: user.id,
-      name: profile?.name || user.email?.split('@')[0] || 'Creator',
-      email: user.email || '',
-      avatar: profile?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-      handle: profile?.handle || user.email?.split('@')[0] || 'creator',
+      id: authUser.id,
+      name: finalDisplayName,
+      displayName: finalDisplayName,
+      email: authUser.email || '',
+      avatar: finalAvatarUrl || '',
+      avatarUrl: finalAvatarUrl || '',
+      handle: profile?.handle || authUser.email?.split('@')[0] || 'creator',
       role: profile?.role || 'creator',
+      authProvider: authProvider,
+      isCustomProfile: isCustom,
       balance: profile?.balance || 0,
       totalEarnings: profile?.total_earnings || 0,
       currency: profile?.currency || 'AED',
       payoutIban: profile?.payout_iban,
-      createdAt: user.created_at
+      payoutMethod: profile?.payout_method,
+      lastSyncedAt: new Date().toISOString(),
+      createdAt: authUser.created_at || new Date().toISOString()
     };
+  },
+
+  async getCurrentUser(): Promise<User | null> {
+    if (!supabase) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    return await this.syncUserProfile(user);
+  },
+
+  async updateUserProfile(userId: string, updates: { displayName?: string; avatarUrl?: string; handle?: string; currency?: string; payoutIban?: string }): Promise<boolean> {
+    if (!supabase) return false;
+
+    const payload: any = {
+      is_custom_profile: true,
+      updated_at: new Date().toISOString()
+    };
+
+    if (updates.displayName !== undefined) payload.display_name = updates.displayName;
+    if (updates.avatarUrl !== undefined) payload.avatar_url = updates.avatarUrl;
+    if (updates.handle !== undefined) payload.handle = updates.handle;
+    if (updates.currency !== undefined) payload.currency = updates.currency;
+    if (updates.payoutIban !== undefined) payload.payout_iban = updates.payoutIban;
+
+    const { error } = await supabase.from('profiles').update(payload).eq('id', userId);
+    if (error) {
+      console.error('Error updating user profile in Supabase:', error);
+      return false;
+    }
+    return true;
   },
 
   // --- Cloud Storage Bucket (unlockly-vault) ---
