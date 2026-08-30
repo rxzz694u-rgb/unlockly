@@ -4,7 +4,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { useToast } from '../context/ToastContext';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
-import { LockIcon, ArrowRightIcon, ShieldIcon, CheckIcon } from '../assets/icons/Icons';
+import { LockIcon, ArrowRightIcon, CheckIcon, GoogleIcon, AppleIcon } from '../assets/icons/Icons';
 import { supabaseService, isSupabaseConfigured } from '../services/supabase';
 
 export const Screen2_Auth: React.FC = () => {
@@ -18,7 +18,51 @@ export const Screen2_Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    showToast('Connecting to Google Auth...', undefined, 'info');
+
+    if (isCloudConnected) {
+      const res = await supabaseService.signInWithGoogle();
+      if (res?.error) {
+        showToast('Google sign-in error', res.error.message, 'error');
+        setIsGoogleLoading(false);
+        return;
+      }
+    } else {
+      setTimeout(() => {
+        login('creator.google@unlockly.io', 'creator');
+        showToast('Signed in with Google', 'creator.google@unlockly.io', 'success');
+        setIsGoogleLoading(false);
+        navigateTo('home');
+      }, 700);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setIsAppleLoading(true);
+    showToast('Connecting to Apple ID...', undefined, 'info');
+
+    if (isCloudConnected) {
+      const res = await supabaseService.signInWithApple();
+      if (res?.error) {
+        showToast('Apple sign-in error', res.error.message, 'error');
+        setIsAppleLoading(false);
+        return;
+      }
+    } else {
+      setTimeout(() => {
+        login('creator.apple@unlockly.io', 'creator');
+        showToast('Signed in with Apple', 'creator.apple@unlockly.io', 'success');
+        setIsAppleLoading(false);
+        navigateTo('home');
+      }, 700);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +135,7 @@ export const Screen2_Auth: React.FC = () => {
     >
       <div>
         {/* Brand Lock */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div
               style={{
@@ -132,11 +176,77 @@ export const Screen2_Auth: React.FC = () => {
         <h1 className="text-headline" style={{ marginBottom: 6 }}>
           {isSignUp ? 'CREATE ACCOUNT.' : 'WELCOME BACK.'}
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 24 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
           {isSignUp
             ? 'Start uploading and monetizing your exclusive content in seconds.'
             : 'Access your creator earnings, analytics, and private links.'}
         </p>
+
+        {/* Social Authentication Buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isGoogleLoading}
+            style={{
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--border-default)',
+              color: '#111111',
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 13.5,
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              cursor: isGoogleLoading ? 'wait' : 'pointer',
+              boxShadow: 'var(--shadow-card)',
+              transition: 'background-color 0.15s ease, transform 0.1s ease'
+            }}
+          >
+            <GoogleIcon size={18} />
+            <span>{isGoogleLoading ? 'CONNECTING GOOGLE...' : 'CONTINUE WITH GOOGLE'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAppleSignIn}
+            disabled={isAppleLoading}
+            style={{
+              width: '100%',
+              backgroundColor: '#111111',
+              border: '1px solid #111111',
+              color: '#FFFFFF',
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 13.5,
+              fontWeight: 700,
+              letterSpacing: '0.02em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              cursor: isAppleLoading ? 'wait' : 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              transition: 'background-color 0.15s ease, transform 0.1s ease'
+            }}
+          >
+            <AppleIcon size={18} />
+            <span>{isAppleLoading ? 'CONNECTING APPLE...' : 'CONTINUE WITH APPLE'}</span>
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0 18px 0' }}>
+          <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border-default)' }} />
+          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            OR EMAIL
+          </span>
+          <div style={{ flex: 1, height: 1, backgroundColor: 'var(--border-default)' }} />
+        </div>
 
         {magicLinkSent ? (
           <div className="surface-card" style={{ padding: '24px 16px', textAlign: 'center' }}>
@@ -185,21 +295,21 @@ export const Screen2_Auth: React.FC = () => {
               />
             )}
 
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 6 }}>
               <Button
                 type="submit"
                 variant="primary"
                 isLoading={isLoading}
                 rightIcon={<ArrowRightIcon size={16} />}
               >
-                {isSignUp ? 'CREATE ACCOUNT' : authMode === 'magic_link' ? 'SEND MAGIC LINK →' : 'CONTINUE'}
+                {isSignUp ? 'CREATE ACCOUNT' : authMode === 'magic_link' ? 'SEND MAGIC LINK →' : 'CONTINUE WITH EMAIL'}
               </Button>
             </div>
           </form>
         )}
 
         {/* Mode Switcher */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18, textAlign: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, textAlign: 'center' }}>
           <button
             type="button"
             onClick={() => setIsSignUp(!isSignUp)}
@@ -237,29 +347,29 @@ export const Screen2_Auth: React.FC = () => {
       {/* Instant Demo Quick Access */}
       <div
         style={{
-          marginTop: 32,
+          marginTop: 28,
           backgroundColor: '#FFFFFF',
           borderRadius: 'var(--radius-lg)',
-          padding: '16px',
+          padding: '14px 16px',
           border: '1px solid var(--border-default)',
           boxShadow: 'var(--shadow-card)'
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>
           FAST DEMO SIGN IN (1-TAP TEST)
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <Button
             variant="secondary"
             onClick={() => handleFastDemoLogin('creator')}
-            style={{ padding: '10px 12px', fontSize: 12 }}
+            style={{ padding: '8px 10px', fontSize: 11.5 }}
           >
             CREATOR RIYAZ
           </Button>
           <Button
             variant="secondary"
             onClick={() => handleFastDemoLogin('buyer')}
-            style={{ padding: '10px 12px', fontSize: 12 }}
+            style={{ padding: '8px 10px', fontSize: 11.5 }}
           >
             BUYER SARAH
           </Button>

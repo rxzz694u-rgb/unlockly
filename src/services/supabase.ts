@@ -41,6 +41,26 @@ export const supabaseService = {
     return await supabase.auth.signInWithOtp({ email });
   },
 
+  async signInWithGoogle() {
+    if (!supabase) return null;
+    return await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+  },
+
+  async signInWithApple() {
+    if (!supabase) return null;
+    return await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+  },
+
   async signOut() {
     if (!supabase) return;
     await supabase.auth.signOut();
