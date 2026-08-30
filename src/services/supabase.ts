@@ -267,7 +267,7 @@ export const supabaseService = {
       createdAt: linkRow.created_at
     };
 
-    const shareUrl = `${window.location.origin}/#/u/${slug}`;
+    const shareUrl = `${window.location.origin}/p/${slug}`;
     return { link, shareUrl };
   },
 

@@ -4,6 +4,7 @@ import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
 import { paymentService } from '../services/paymentService';
 import { isSupabaseConfigured, supabaseService } from '../services/supabase';
+import { nanoid } from 'nanoid';
 
 export interface CreateProductDraft {
   title: string;
@@ -155,8 +156,9 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const publishDraft = async (): Promise<Product> => {
-    const productId = 'prod_' + Math.random().toString(36).substring(2, 9) + Date.now();
-    const slug = draft.customShareSlug || draft.title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 30) || 'exclusive';
+    const cleanCustom = draft.customShareSlug?.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    const slug = cleanCustom || nanoid(8);
+    const productId = slug;
 
     const newProduct: Product = {
       id: productId,

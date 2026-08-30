@@ -54,49 +54,73 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [historyStack, setHistoryStack] = useState<ScreenId[]>(['home']);
   const [viewportMode, setViewportMode] = useState<ViewportMode>('mobile');
 
-  // Handle URL hash & pathname changes (e.g. #/u/xyz123, /u/xyz123, #/p/prod_123)
+  // Real Path Routing Parser (reads window.location.pathname)
   useEffect(() => {
     const handleRoute = () => {
-      const hash = window.location.hash;
       const pathname = window.location.pathname;
+      const hash = window.location.hash;
 
-      if (hash.startsWith('#/u/')) {
-        const slug = hash.replace('#/u/', '').split('?')[0];
+      // 1. Path-based routing: /p/:slug (Public Drop)
+      if (pathname.startsWith('/p/')) {
+        const slug = pathname.replace('/p/', '').split('?')[0].split('/')[0];
         if (slug) {
-          setActiveSlug(slug);
-          setCurrentScreen('direct_unlock');
-          return;
-        }
-      } else if (pathname.startsWith('/u/')) {
-        const slug = pathname.replace('/u/', '').split('?')[0];
-        if (slug) {
-          setActiveSlug(slug);
-          setCurrentScreen('direct_unlock');
-          return;
-        }
-      } else if (hash.startsWith('#/p/')) {
-        const id = hash.replace('#/p/', '').split('?')[0];
-        if (id) {
-          setActiveProductId(id);
+          setActiveProductId(slug);
           setCurrentScreen('public_product');
           return;
         }
-      } else if (hash === '#/welcome') {
+      }
+
+      // 2. Path-based routing: /u/:slug (Direct Unlock)
+      if (pathname.startsWith('/u/')) {
+        const slug = pathname.replace('/u/', '').split('?')[0].split('/')[0];
+        if (slug) {
+          setActiveSlug(slug);
+          setCurrentScreen('direct_unlock');
+          return;
+        }
+      }
+
+      // 3. Fallback for legacy hash links (auto-upgrade to real path routing)
+      if (hash.startsWith('#/p/')) {
+        const slug = hash.replace('#/p/', '').split('?')[0];
+        if (slug) {
+          window.history.replaceState(null, '', `/p/${slug}`);
+          setActiveProductId(slug);
+          setCurrentScreen('public_product');
+          return;
+        }
+      } else if (hash.startsWith('#/u/')) {
+        const slug = hash.replace('#/u/', '').split('?')[0];
+        if (slug) {
+          window.history.replaceState(null, '', `/u/${slug}`);
+          setActiveSlug(slug);
+          setCurrentScreen('direct_unlock');
+          return;
+        }
+      }
+
+      // 4. Standard App Paths
+      if (pathname === '/welcome' || hash === '#/welcome') {
         setCurrentScreen('welcome');
-      } else if (hash === '#/library') {
+      } else if (pathname === '/auth' || hash === '#/auth') {
+        setCurrentScreen('auth');
+      } else if (pathname === '/library' || hash === '#/library') {
         setCurrentScreen('library');
         setActiveTabState('library');
-      } else if (hash === '#/auth') {
-        setCurrentScreen('auth');
+      } else if (pathname === '/profile' || hash === '#/profile') {
+        setCurrentScreen('profile');
+        setActiveTabState('profile');
+      } else if (pathname === '/overview' || pathname === '/stats') {
+        setCurrentScreen('creator_overview');
       }
     };
 
     handleRoute();
-    window.addEventListener('hashchange', handleRoute);
     window.addEventListener('popstate', handleRoute);
+    window.addEventListener('hashchange', handleRoute);
     return () => {
-      window.removeEventListener('hashchange', handleRoute);
       window.removeEventListener('popstate', handleRoute);
+      window.removeEventListener('hashchange', handleRoute);
     };
   }, []);
 
@@ -117,6 +141,27 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (screen === 'library') setActiveTabState('library');
     if (screen === 'profile') setActiveTabState('profile');
 
+    // Update browser URL using clean path routing
+    try {
+      if (screen === 'public_product' && params?.productId) {
+        window.history.pushState(null, '', `/p/${params.productId}`);
+      } else if (screen === 'direct_unlock' && params?.slug) {
+        window.history.pushState(null, '', `/u/${params.slug}`);
+      } else if (screen === 'home') {
+        window.history.pushState(null, '', '/');
+      } else if (screen === 'profile') {
+        window.history.pushState(null, '', '/profile');
+      } else if (screen === 'library') {
+        window.history.pushState(null, '', '/library');
+      } else if (screen === 'welcome') {
+        window.history.pushState(null, '', '/welcome');
+      } else if (screen === 'auth') {
+        window.history.pushState(null, '', '/auth');
+      }
+    } catch {
+      // Fallback in restricted iframe environments
+    }
+
     setHistoryStack((prev) => [...prev, screen]);
     setCurrentScreen(screen);
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -127,6 +172,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (prev.length <= 1) {
         setCurrentScreen('home');
         setActiveTabState('home');
+        window.history.pushState(null, '', '/');
         return ['home'];
       }
       const newStack = [...prev];
@@ -134,9 +180,16 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const previousScreen = newStack[newStack.length - 1];
       setCurrentScreen(previousScreen);
 
-      if (previousScreen === 'home') setActiveTabState('home');
-      if (previousScreen === 'library') setActiveTabState('library');
-      if (previousScreen === 'profile') setActiveTabState('profile');
+      if (previousScreen === 'home') {
+        setActiveTabState('home');
+        window.history.pushState(null, '', '/');
+      } else if (previousScreen === 'library') {
+        setActiveTabState('library');
+        window.history.pushState(null, '', '/library');
+      } else if (previousScreen === 'profile') {
+        setActiveTabState('profile');
+        window.history.pushState(null, '', '/profile');
+      }
 
       return newStack;
     });
@@ -153,7 +206,6 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const openPublicProduct = useCallback((productId: string) => {
     setActiveProductId(productId);
     navigateTo('public_product', { productId });
-    window.location.hash = `#/p/${productId}`;
   }, [navigateTo]);
 
   const openProductManage = useCallback((productId: string) => {

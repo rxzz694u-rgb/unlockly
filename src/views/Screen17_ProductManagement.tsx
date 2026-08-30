@@ -44,7 +44,7 @@ export const Screen17_ProductManagement: React.FC = () => {
     );
   }
 
-  const shareUrl = `${window.location.origin}/#/p/${product.id}`;
+  const shareUrl = `${window.location.origin}/p/${product.id}`;
 
   const handleCopy = async () => {
     try {

@@ -27,7 +27,7 @@ export const Screen10_PublicContent: React.FC = () => {
 
   const product = products.find((p) => p.id === activeProductId);
   const isUnlocked = product ? hasAccess(product.id) : false;
-  const shareUrl = product ? `${window.location.origin}/#/p/${product.id}` : `${window.location.origin}/`;
+  const shareUrl = product ? `${window.location.origin}/p/${product.id}` : `${window.location.origin}/`;
 
   const handleStartUnlock = () => {
     if (!product) return;

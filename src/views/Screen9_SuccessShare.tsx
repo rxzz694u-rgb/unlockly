@@ -19,7 +19,7 @@ export const Screen9_SuccessShare: React.FC = () => {
 
   const product = publishedProduct || products.find((p) => p.id === activeProductId) || products[0];
   const slug = product?.customShareSlug || product?.id || 'exclusive';
-  const shareUrl = product ? `${window.location.origin}/#/u/${slug}` : `${window.location.origin}/`;
+  const shareUrl = product ? `${window.location.origin}/p/${slug}` : `${window.location.origin}/`;
 
   const handleCopy = async () => {
     try {
