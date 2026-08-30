@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Product, ProductFile, Purchase, AccessPermission, CurrencyCode, AccessType, ActivityItem } from '../types';
 import { dbService } from '../services/db';
-import { INITIAL_PRODUCTS, INITIAL_PURCHASES, INITIAL_PERMISSIONS, INITIAL_ACTIVITIES } from '../services/demoData';
 import { useAuth } from './AuthContext';
 import { paymentService } from '../services/paymentService';
+import { isSupabaseConfigured, supabaseService } from '../services/supabase';
 
 export interface CreateProductDraft {
   title: string;
@@ -39,6 +39,7 @@ interface ProductContextType {
   permissions: AccessPermission[];
   activities: ActivityItem[];
   draft: CreateProductDraft;
+  isCloudSyncing: boolean;
   updateDraft: (updates: Partial<CreateProductDraft>) => void;
   addDraftFiles: (files: ProductFile[]) => void;
   removeDraftFile: (fileId: string) => void;
@@ -56,11 +57,9 @@ interface ProductContextType {
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
-// Clean out old pre-populated demo items from previous session if found
 function getCleanInitialProducts(): Product[] {
   const saved = dbService.getProducts();
   if (saved && saved.length > 0) {
-    // Filter out old hardcoded demo products
     const filtered = saved.filter(
       (p) => !['prod_summer_photos', 'prod_bts_reel', 'prod_creator_pack'].includes(p.id)
     );
@@ -72,58 +71,35 @@ function getCleanInitialProducts(): Product[] {
   return [];
 }
 
-function getCleanInitialPurchases(): Purchase[] {
-  const saved = dbService.getPurchases();
-  if (saved && saved.length > 0) {
-    const filtered = saved.filter((p) => p.id !== 'purch_demo_1');
-    if (filtered.length !== saved.length) {
-      dbService.savePurchases(filtered);
-    }
-    return filtered;
-  }
-  return [];
-}
-
-function getCleanInitialPermissions(): AccessPermission[] {
-  const saved = dbService.getAccessPermissions();
-  if (saved && saved.length > 0) {
-    const filtered = saved.filter((p) => p.id !== 'perm_demo_1');
-    if (filtered.length !== saved.length) {
-      dbService.saveAccessPermissions(filtered);
-    }
-    return filtered;
-  }
-  return [];
-}
-
-function getCleanInitialActivities(): ActivityItem[] {
-  const saved = dbService.getActivities();
-  if (saved && saved.length > 0) {
-    const filtered = saved.filter(
-      (a) => !['act_1', 'act_2', 'act_3', 'act_4'].includes(a.id)
-    );
-    if (filtered.length !== saved.length) {
-      dbService.saveActivities(filtered);
-    }
-    return filtered;
-  }
-  return [];
-}
-
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
 
   const [products, setProducts] = useState<Product[]>(() => getCleanInitialProducts());
-  const [purchases, setPurchases] = useState<Purchase[]>(() => getCleanInitialPurchases());
-  const [permissions, setPermissions] = useState<AccessPermission[]>(() => getCleanInitialPermissions());
-  const [activities, setActivities] = useState<ActivityItem[]>(() => getCleanInitialActivities());
+  const [purchases, setPurchases] = useState<Purchase[]>(() => dbService.getPurchases());
+  const [permissions, setPermissions] = useState<AccessPermission[]>(() => dbService.getAccessPermissions());
+  const [activities, setActivities] = useState<ActivityItem[]>(() => dbService.getActivities());
   const [draft, setDraft] = useState<CreateProductDraft>(DEFAULT_DRAFT);
+  const [isCloudSyncing, setIsCloudSyncing] = useState(false);
+
+  // Sync with Supabase on startup if configured
+  useEffect(() => {
+    if (isSupabaseConfigured()) {
+      setIsCloudSyncing(true);
+      supabaseService.getProducts().then((cloudProducts) => {
+        if (cloudProducts && cloudProducts.length > 0) {
+          setProducts(cloudProducts);
+          dbService.saveProducts(cloudProducts);
+        }
+        setIsCloudSyncing(false);
+      }).catch(() => setIsCloudSyncing(false));
+    }
+  }, []);
 
   const refreshData = useCallback(() => {
     setProducts(getCleanInitialProducts());
-    setPurchases(getCleanInitialPurchases());
-    setPermissions(getCleanInitialPermissions());
-    setActivities(getCleanInitialActivities());
+    setPurchases(dbService.getPurchases());
+    setPermissions(dbService.getAccessPermissions());
+    setActivities(dbService.getActivities());
   }, []);
 
   const clearAllData = useCallback(() => {
@@ -207,6 +183,15 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updatedAt: new Date().toISOString()
     };
 
+    // Save to Supabase Cloud if configured
+    if (isSupabaseConfigured()) {
+      try {
+        await supabaseService.createProduct(newProduct);
+      } catch (err) {
+        console.warn('Supabase cloud product save warning:', err);
+      }
+    }
+
     const nextProducts = [newProduct, ...products];
     setProducts(nextProducts);
     dbService.saveProducts(nextProducts);
@@ -254,6 +239,9 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const recordPurchase = (purchase: Purchase, permission: AccessPermission) => {
+    if (isSupabaseConfigured()) {
+      supabaseService.recordPurchase(purchase, permission).catch(console.warn);
+    }
     setPurchases((prev) => [purchase, ...prev]);
     setPermissions((prev) => [permission, ...prev]);
     refreshData();
@@ -267,6 +255,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         permissions,
         activities,
         draft,
+        isCloudSyncing,
         updateDraft,
         addDraftFiles,
         removeDraftFile,

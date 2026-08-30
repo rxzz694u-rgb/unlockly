@@ -2,12 +2,14 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { dbService } from '../services/db';
 import { INITIAL_CREATOR, DEMO_BUYER } from '../services/demoData';
+import { supabase, isSupabaseConfigured, supabaseService } from '../services/supabase';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isCreator: boolean;
-  login: (email: string, role?: 'creator' | 'buyer') => Promise<void>;
+  isCloudConnected: boolean;
+  login: (email: string, role?: 'creator' | 'buyer', password?: string) => Promise<void>;
   logout: () => void;
   switchRole: (role: 'creator' | 'buyer') => void;
   updateProfile: (updated: Partial<User>) => void;
@@ -23,30 +25,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return INITIAL_CREATOR;
   });
 
+  const isCloudConnected = isSupabaseConfigured();
+
+  // Listen for real Supabase auth state changes
+  useEffect(() => {
+    if (!isCloudConnected || !supabase) return;
+
+    supabaseService.getCurrentUser().then((cloudUser) => {
+      if (cloudUser) {
+        setUser(cloudUser);
+        dbService.saveUser(cloudUser);
+      }
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const cloudUser = await supabaseService.getCurrentUser();
+        if (cloudUser) {
+          setUser(cloudUser);
+          dbService.saveUser(cloudUser);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(INITIAL_CREATOR);
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [isCloudConnected]);
+
   useEffect(() => {
     if (user) {
       dbService.saveUser(user);
     }
   }, [user]);
 
-  const login = async (email: string, role: 'creator' | 'buyer' = 'creator') => {
-    let newUser: User;
-    if (role === 'buyer') {
-      newUser = {
-        ...DEMO_BUYER,
-        email: email || DEMO_BUYER.email
-      };
-    } else {
-      newUser = {
-        ...INITIAL_CREATOR,
-        email: email || INITIAL_CREATOR.email
-      };
+  const login = async (email: string, role: 'creator' | 'buyer' = 'creator', password?: string) => {
+    if (isCloudConnected && supabase) {
+      try {
+        await supabaseService.signIn(email, password);
+      } catch (err) {
+        console.warn('Supabase sign-in note:', err);
+      }
     }
+
+    const newUser: User = role === 'buyer'
+      ? { ...DEMO_BUYER, email: email || DEMO_BUYER.email }
+      : { ...INITIAL_CREATOR, email: email || INITIAL_CREATOR.email };
+
     setUser(newUser);
     dbService.saveUser(newUser);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    if (isCloudConnected && supabase) {
+      await supabaseService.signOut();
+    }
     setUser(null);
     localStorage.removeItem('unlockly_user');
   };
@@ -74,6 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         isAuthenticated: !!user,
         isCreator: user?.role === 'creator',
+        isCloudConnected,
         login,
         logout,
         switchRole,
