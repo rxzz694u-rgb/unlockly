@@ -133,6 +133,28 @@ export interface CreatorStats {
   recentActivity: ActivityItem[];
 }
 
+export interface MediaLink {
+  id: string;
+  creatorId: string;
+  slug: string;
+  mediaUrl: string;
+  mediaType?: string;
+  title?: string;
+  description?: string;
+  price?: number;
+  currency?: CurrencyCode;
+  previewBlurUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface LinkUnlock {
+  id: string;
+  linkId: string;
+  viewerId: string;
+  unlockedAt: string;
+}
+
 export interface ToastMessage {
   id: string;
   title: string;

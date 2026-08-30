@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { Product, ProductFile, Purchase, AccessPermission, User } from '../types';
+import { nanoid } from 'nanoid';
+import { Product, ProductFile, Purchase, AccessPermission, User, MediaLink, LinkUnlock } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -195,6 +196,121 @@ export const supabaseService = {
     const { error } = await supabase.from('profiles').update(payload).eq('id', userId);
     if (error) {
       console.error('Error updating user profile in Supabase:', error);
+      return false;
+    }
+    return true;
+  },
+
+  // --- Media Links & Direct Content Unlocks (/u/[slug]) ---
+  async createShareableLink(
+    file: File,
+    creatorId: string,
+    metadata?: { title?: string; description?: string; price?: number; previewBlurUrl?: string }
+  ): Promise<{ link: MediaLink; shareUrl: string } | null> {
+    if (!supabase) return null;
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filePath = `${creatorId}/${Date.now()}-${safeName}`;
+
+    // 1. Upload to Supabase Storage bucket
+    const { data: uploadData, error: uploadErr } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadErr) {
+      console.error('Error uploading media to storage:', uploadErr);
+      throw uploadErr;
+    }
+
+    // 2. Get Public Storage URL
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    const slug = nanoid(8);
+
+    // 3. Insert record into media_links table
+    const { data: linkRow, error: dbErr } = await supabase
+      .from('media_links')
+      .insert({
+        creator_id: creatorId,
+        slug: slug,
+        media_url: urlData.publicUrl,
+        media_type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+        title: metadata?.title || file.name,
+        description: metadata?.description || '',
+        price: metadata?.price || 0,
+        currency: 'AED',
+        preview_blur_url: metadata?.previewBlurUrl || '',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (dbErr || !linkRow) {
+      console.error('Error inserting media_link:', dbErr);
+      throw dbErr;
+    }
+
+    const link: MediaLink = {
+      id: linkRow.id,
+      creatorId: linkRow.creator_id,
+      slug: linkRow.slug,
+      mediaUrl: linkRow.media_url,
+      mediaType: linkRow.media_type,
+      title: linkRow.title,
+      description: linkRow.description,
+      price: linkRow.price,
+      currency: linkRow.currency,
+      previewBlurUrl: linkRow.preview_blur_url,
+      isActive: linkRow.is_active,
+      createdAt: linkRow.created_at
+    };
+
+    const shareUrl = `${window.location.origin}/#/u/${slug}`;
+    return { link, shareUrl };
+  },
+
+  async getMediaLinkBySlug(slug: string): Promise<MediaLink | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+      .from('media_links')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      creatorId: data.creator_id,
+      slug: data.slug,
+      mediaUrl: data.media_url,
+      mediaType: data.media_type,
+      title: data.title,
+      description: data.description,
+      price: data.price,
+      currency: data.currency,
+      previewBlurUrl: data.preview_blur_url,
+      isActive: data.is_active,
+      createdAt: data.created_at
+    };
+  },
+
+  async recordLinkUnlock(linkId: string, viewerId: string): Promise<boolean> {
+    if (!supabase) return false;
+    const { error } = await supabase.from('link_unlocks').upsert(
+      {
+        link_id: linkId,
+        viewer_id: viewerId,
+        unlocked_at: new Date().toISOString()
+      },
+      { onConflict: 'link_id,viewer_id' }
+    );
+
+    if (error) {
+      console.warn('Error recording link unlock:', error);
       return false;
     }
     return true;

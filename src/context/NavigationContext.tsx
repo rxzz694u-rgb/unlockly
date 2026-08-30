@@ -11,6 +11,7 @@ export type ScreenId =
   | 'create_step5'
   | 'publish_success'
   | 'public_product'
+  | 'direct_unlock'
   | 'access_gate'
   | 'checkout'
   | 'payment_processing'
@@ -29,10 +30,11 @@ interface NavigationContextType {
   currentScreen: ScreenId;
   activeTab: BottomNavTab;
   activeProductId: string | null;
+  activeSlug: string | null;
   viewportMode: ViewportMode;
   publishedProduct: any | null;
   historyStack: ScreenId[];
-  navigateTo: (screen: ScreenId, params?: { productId?: string; publishedProduct?: any }) => void;
+  navigateTo: (screen: ScreenId, params?: { productId?: string; publishedProduct?: any; slug?: string }) => void;
   goBack: () => void;
   setActiveTab: (tab: BottomNavTab) => void;
   setViewportMode: (mode: ViewportMode) => void;
@@ -47,39 +49,66 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('home');
   const [activeTab, setActiveTabState] = useState<BottomNavTab>('home');
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [publishedProduct, setPublishedProduct] = useState<any | null>(null);
   const [historyStack, setHistoryStack] = useState<ScreenId[]>(['home']);
   const [viewportMode, setViewportMode] = useState<ViewportMode>('mobile');
 
-  // Handle URL hash changes (e.g. #/p/prod_summer_photos)
+  // Handle URL hash & pathname changes (e.g. #/u/xyz123, /u/xyz123, #/p/prod_123)
   useEffect(() => {
-    const handleHash = () => {
+    const handleRoute = () => {
       const hash = window.location.hash;
-      if (hash.startsWith('#/p/')) {
-        const id = hash.replace('#/p/', '');
+      const pathname = window.location.pathname;
+
+      if (hash.startsWith('#/u/')) {
+        const slug = hash.replace('#/u/', '').split('?')[0];
+        if (slug) {
+          setActiveSlug(slug);
+          setCurrentScreen('direct_unlock');
+          return;
+        }
+      } else if (pathname.startsWith('/u/')) {
+        const slug = pathname.replace('/u/', '').split('?')[0];
+        if (slug) {
+          setActiveSlug(slug);
+          setCurrentScreen('direct_unlock');
+          return;
+        }
+      } else if (hash.startsWith('#/p/')) {
+        const id = hash.replace('#/p/', '').split('?')[0];
         if (id) {
           setActiveProductId(id);
           setCurrentScreen('public_product');
+          return;
         }
       } else if (hash === '#/welcome') {
         setCurrentScreen('welcome');
       } else if (hash === '#/library') {
         setCurrentScreen('library');
         setActiveTabState('library');
+      } else if (hash === '#/auth') {
+        setCurrentScreen('auth');
       }
     };
 
-    handleHash();
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+    handleRoute();
+    window.addEventListener('hashchange', handleRoute);
+    window.addEventListener('popstate', handleRoute);
+    return () => {
+      window.removeEventListener('hashchange', handleRoute);
+      window.removeEventListener('popstate', handleRoute);
+    };
   }, []);
 
-  const navigateTo = useCallback((screen: ScreenId, params?: { productId?: string; publishedProduct?: any }) => {
+  const navigateTo = useCallback((screen: ScreenId, params?: { productId?: string; publishedProduct?: any; slug?: string }) => {
     if (params?.productId) {
       setActiveProductId(params.productId);
     }
     if (params?.publishedProduct) {
       setPublishedProduct(params.publishedProduct);
+    }
+    if (params?.slug) {
+      setActiveSlug(params.slug);
     }
 
     // Sync active tab with main screens
@@ -100,15 +129,16 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setActiveTabState('home');
         return ['home'];
       }
-      const nextStack = prev.slice(0, -1);
-      const prevScreen = nextStack[nextStack.length - 1];
-      setCurrentScreen(prevScreen);
-      
-      if (prevScreen === 'home') setActiveTabState('home');
-      if (prevScreen === 'library') setActiveTabState('library');
-      if (prevScreen === 'profile') setActiveTabState('profile');
-      
-      return nextStack;
+      const newStack = [...prev];
+      newStack.pop();
+      const previousScreen = newStack[newStack.length - 1];
+      setCurrentScreen(previousScreen);
+
+      if (previousScreen === 'home') setActiveTabState('home');
+      if (previousScreen === 'library') setActiveTabState('library');
+      if (previousScreen === 'profile') setActiveTabState('profile');
+
+      return newStack;
     });
   }, []);
 
@@ -122,8 +152,8 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const openPublicProduct = useCallback((productId: string) => {
     setActiveProductId(productId);
-    window.location.hash = `#/p/${productId}`;
     navigateTo('public_product', { productId });
+    window.location.hash = `#/p/${productId}`;
   }, [navigateTo]);
 
   const openProductManage = useCallback((productId: string) => {
@@ -142,6 +172,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         currentScreen,
         activeTab,
         activeProductId,
+        activeSlug,
         viewportMode,
         publishedProduct,
         historyStack,
@@ -160,7 +191,9 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 };
 
 export const useNavigation = () => {
-  const ctx = useContext(NavigationContext);
-  if (!ctx) throw new Error('useNavigation must be used within NavigationProvider');
-  return ctx;
+  const context = useContext(NavigationContext);
+  if (!context) {
+    throw new Error('useNavigation must be used within a NavigationProvider');
+  }
+  return context;
 };

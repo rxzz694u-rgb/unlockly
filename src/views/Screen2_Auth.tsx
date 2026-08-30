@@ -23,6 +23,17 @@ export const Screen2_Auth: React.FC = () => {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
+  const redirectAfterAuth = () => {
+    const pendingSlug = localStorage.getItem('pending_unlock_slug');
+    if (pendingSlug) {
+      localStorage.removeItem('pending_unlock_slug');
+      navigateTo('direct_unlock', { slug: pendingSlug });
+      window.location.hash = `#/u/${pendingSlug}`;
+    } else {
+      navigateTo('home');
+    }
+  };
+
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     showToast('Connecting to Google...', undefined, 'info');
@@ -40,7 +51,7 @@ export const Screen2_Auth: React.FC = () => {
         await login(userEmail, 'creator');
         showToast('Signed in with Google', userEmail, 'success');
         setIsGoogleLoading(false);
-        navigateTo('home');
+        redirectAfterAuth();
       }
     } catch (err: any) {
       setIsGoogleLoading(false);
@@ -90,12 +101,12 @@ export const Screen2_Auth: React.FC = () => {
 
       await login(email, 'creator', password);
       setIsLoading(false);
-      navigateTo('home');
+      redirectAfterAuth();
     } catch (err: any) {
       setIsLoading(false);
       showToast('Authentication notice', err?.message || 'Logged in locally', 'info');
       await login(email, 'creator');
-      navigateTo('home');
+      redirectAfterAuth();
     }
   };
 
@@ -118,7 +129,7 @@ export const Screen2_Auth: React.FC = () => {
       await login(email, 'creator');
       setIsVerifyingOtp(false);
       showToast('Signed in successfully!', email, 'success');
-      navigateTo('home');
+      redirectAfterAuth();
     } catch (err: any) {
       setIsVerifyingOtp(false);
       showToast('Verification failed', err?.message || 'Check code and try again', 'error');

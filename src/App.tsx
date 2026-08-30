@@ -18,6 +18,7 @@ import { Screen7_Pricing } from './views/Screen7_Pricing';
 import { Screen8_Publish } from './views/Screen8_Publish';
 import { Screen9_SuccessShare } from './views/Screen9_SuccessShare';
 import { Screen10_PublicContent } from './views/Screen10_PublicContent';
+import { Screen_DirectUnlock } from './views/Screen_DirectUnlock';
 import { Screen14_PaymentSuccess } from './views/Screen14_PaymentSuccess';
 import { Screen15_UnlockedContent } from './views/Screen15_UnlockedContent';
 import { Screen16_Library } from './views/Screen16_Library';
@@ -51,6 +52,8 @@ const MainAppContent: React.FC = () => {
         return <Screen9_SuccessShare />;
       case 'public_product':
         return <Screen10_PublicContent />;
+      case 'direct_unlock':
+        return <Screen_DirectUnlock />;
       case 'payment_success':
         return <Screen14_PaymentSuccess />;
       case 'unlocked_content':
