@@ -1,0 +1,19 @@
+{
+  "name": "Unlockly — Private Content. Instant Access.",
+  "short_name": "Unlockly",
+  "description": "Monetize and share exclusive digital content with secure unlock links.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F8F6",
+  "theme_color": "#F8F8F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "finance", "entertainment", "social"]
+}
