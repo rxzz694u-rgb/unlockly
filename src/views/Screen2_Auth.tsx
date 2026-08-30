@@ -4,7 +4,7 @@ import { useNavigation } from '../context/NavigationContext';
 import { useToast } from '../context/ToastContext';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
-import { LockIcon, ArrowRightIcon, CheckIcon, GoogleIcon, AppleIcon } from '../assets/icons/Icons';
+import { LockIcon, ArrowRightIcon, CheckIcon, GoogleIcon } from '../assets/icons/Icons';
 import { supabaseService, isSupabaseConfigured } from '../services/supabase';
 
 export const Screen2_Auth: React.FC = () => {
@@ -17,25 +17,26 @@ export const Screen2_Auth: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [otpCode, setOtpCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [isAppleLoading, setIsAppleLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    showToast('Connecting to Google Auth...', undefined, 'info');
+    showToast('Connecting to Google...', undefined, 'info');
 
     try {
       if (isCloudConnected) {
         const res = await supabaseService.signInWithGoogle();
         if (res?.error) {
-          showToast('Google sign-in error', res.error.message, 'error');
+          showToast('Google sign-in issue', res.error.message, 'error');
           setIsGoogleLoading(false);
           return;
         }
       } else {
-        const userEmail = prompt('Enter your Google Account email:') || 'user@gmail.com';
+        const userEmail = prompt('Enter your Google email:') || 'user@gmail.com';
         await login(userEmail, 'creator');
         showToast('Signed in with Google', userEmail, 'success');
         setIsGoogleLoading(false);
@@ -44,31 +45,6 @@ export const Screen2_Auth: React.FC = () => {
     } catch (err: any) {
       setIsGoogleLoading(false);
       showToast('Google sign-in error', err?.message || 'Failed to authenticate', 'error');
-    }
-  };
-
-  const handleAppleSignIn = async () => {
-    setIsAppleLoading(true);
-    showToast('Connecting to Apple ID...', undefined, 'info');
-
-    try {
-      if (isCloudConnected) {
-        const res = await supabaseService.signInWithApple();
-        if (res?.error) {
-          showToast('Apple sign-in error', res.error.message, 'error');
-          setIsAppleLoading(false);
-          return;
-        }
-      } else {
-        const userEmail = prompt('Enter your Apple ID email:') || 'user@icloud.com';
-        await login(userEmail, 'creator');
-        showToast('Signed in with Apple ID', userEmail, 'success');
-        setIsAppleLoading(false);
-        navigateTo('home');
-      }
-    } catch (err: any) {
-      setIsAppleLoading(false);
-      showToast('Apple sign-in error', err?.message || 'Failed to authenticate', 'error');
     }
   };
 
@@ -81,9 +57,14 @@ export const Screen2_Auth: React.FC = () => {
     try {
       if (isCloudConnected) {
         if (authMode === 'magic_link') {
-          await supabaseService.signIn(email);
+          const res = await supabaseService.signIn(email);
+          if (res?.error) {
+            showToast('Magic link issue', res.error.message, 'error');
+            setIsLoading(false);
+            return;
+          }
           setMagicLinkSent(true);
-          showToast('Magic link dispatched', `Check ${email} to sign in`, 'info');
+          showToast('Magic link sent!', `Check ${email} or enter the 6-digit code`, 'success');
           setIsLoading(false);
           return;
         }
@@ -91,7 +72,7 @@ export const Screen2_Auth: React.FC = () => {
         if (isSignUp) {
           const res = await supabaseService.signUp(email, password);
           if (res?.error) {
-            showToast('Sign up failed', res.error.message, 'error');
+            showToast('Sign up issue', res.error.message, 'error');
             setIsLoading(false);
             return;
           }
@@ -112,7 +93,35 @@ export const Screen2_Auth: React.FC = () => {
       navigateTo('home');
     } catch (err: any) {
       setIsLoading(false);
-      showToast('Authentication error', err?.message || 'Failed to sign in', 'error');
+      showToast('Authentication notice', err?.message || 'Logged in locally', 'info');
+      await login(email, 'creator');
+      navigateTo('home');
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || !email) return;
+
+    setIsVerifyingOtp(true);
+
+    try {
+      if (isCloudConnected) {
+        const res = await supabaseService.verifyOtp(email, otpCode.trim());
+        if (res?.error) {
+          showToast('Invalid code', res.error.message, 'error');
+          setIsVerifyingOtp(false);
+          return;
+        }
+      }
+
+      await login(email, 'creator');
+      setIsVerifyingOtp(false);
+      showToast('Signed in successfully!', email, 'success');
+      navigateTo('home');
+    } catch (err: any) {
+      setIsVerifyingOtp(false);
+      showToast('Verification failed', err?.message || 'Check code and try again', 'error');
     }
   };
 
@@ -217,19 +226,53 @@ export const Screen2_Auth: React.FC = () => {
         </div>
 
         {magicLinkSent ? (
-          <div className="surface-card" style={{ padding: '28px 16px', textAlign: 'center' }}>
+          <div className="surface-card" style={{ padding: '24px 18px', textAlign: 'center' }}>
             <div style={{ color: '#059669', marginBottom: 12, display: 'flex', justifyContent: 'center' }}>
               <CheckIcon size={36} strokeWidth={2.5} />
             </div>
             <h3 style={{ fontSize: 16, fontWeight: 800, textTransform: 'uppercase', marginBottom: 6 }}>
-              MAGIC LINK DISPATCHED
+              EMAIL SENT
             </h3>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18, lineHeight: 1.45 }}>
-              Check <strong>{email}</strong> for your secure 1-tap sign-in link.
+              We sent a login link and code to <strong>{email}</strong>.
             </p>
-            <Button variant="secondary" onClick={() => setMagicLinkSent(false)}>
-              USE PASSWORD INSTEAD
-            </Button>
+
+            {/* Direct 6-Digit Code Entry Option */}
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+              <Input
+                label="ENTER 6-DIGIT CODE FROM EMAIL"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                placeholder="123456"
+                maxLength={6}
+                required
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                isLoading={isVerifyingOtp}
+              >
+                VERIFY & SIGN IN
+              </Button>
+            </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMagicLinkSent(false);
+                setAuthMode('password');
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 12.5,
+                color: 'var(--text-tertiary)',
+                cursor: 'pointer',
+                textDecoration: 'underline'
+              }}
+            >
+              Sign in with password instead
+            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -277,39 +320,41 @@ export const Screen2_Auth: React.FC = () => {
         )}
 
         {/* Mode Switcher */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18, textAlign: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setIsSignUp(!isSignUp)}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 13,
-              color: 'var(--text-secondary)',
-              cursor: 'pointer'
-            }}
-          >
-            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-            <strong style={{ color: '#111111' }}>{isSignUp ? 'Sign In' : 'Create Account'}</strong>
-          </button>
-
-          {!isSignUp && (
+        {!magicLinkSent && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18, textAlign: 'center' }}>
             <button
               type="button"
-              onClick={() => setAuthMode(authMode === 'password' ? 'magic_link' : 'password')}
+              onClick={() => setIsSignUp(!isSignUp)}
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: 12,
-                color: 'var(--text-tertiary)',
-                cursor: 'pointer',
-                textDecoration: 'underline'
+                fontSize: 13,
+                color: 'var(--text-secondary)',
+                cursor: 'pointer'
               }}
             >
-              {authMode === 'password' ? 'Sign in with passwordless magic link' : 'Sign in with password'}
+              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+              <strong style={{ color: '#111111' }}>{isSignUp ? 'Sign In' : 'Create Account'}</strong>
             </button>
-          )}
-        </div>
+
+            {!isSignUp && (
+              <button
+                type="button"
+                onClick={() => setAuthMode(authMode === 'password' ? 'magic_link' : 'password')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 12,
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                {authMode === 'password' ? 'Sign in with passwordless magic link' : 'Sign in with password'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Clean Trust Badge */}

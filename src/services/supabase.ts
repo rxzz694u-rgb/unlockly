@@ -38,7 +38,22 @@ export const supabaseService = {
     if (password) {
       return await supabase.auth.signInWithPassword({ email, password });
     }
-    return await supabase.auth.signInWithOtp({ email });
+    return await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+        shouldCreateUser: true,
+      },
+    });
+  },
+
+  async verifyOtp(email: string, token: string) {
+    if (!supabase) return null;
+    return await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email'
+    });
   },
 
   async signInWithGoogle() {
