@@ -177,7 +177,7 @@ export const Screen2_Auth: React.FC = () => {
             : 'Access your creator earnings, analytics, and private links.'}
         </p>
 
-        {/* Real OAuth Sign In Buttons */}
+        {/* Real Google OAuth Sign In Button */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
           <button
             type="button"
@@ -204,33 +204,6 @@ export const Screen2_Auth: React.FC = () => {
           >
             <GoogleIcon size={19} />
             <span>{isGoogleLoading ? 'CONNECTING GOOGLE...' : 'CONTINUE WITH GOOGLE'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleAppleSignIn}
-            disabled={isAppleLoading}
-            style={{
-              width: '100%',
-              backgroundColor: '#111111',
-              border: '1px solid #111111',
-              color: '#FFFFFF',
-              padding: '13px 16px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 13.5,
-              fontWeight: 700,
-              letterSpacing: '0.02em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              cursor: isAppleLoading ? 'wait' : 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-              transition: 'background-color 0.15s ease, transform 0.1s ease'
-            }}
-          >
-            <AppleIcon size={19} />
-            <span>{isAppleLoading ? 'CONNECTING APPLE...' : 'CONTINUE WITH APPLE'}</span>
           </button>
         </div>
 
